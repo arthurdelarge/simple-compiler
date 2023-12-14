@@ -2,9 +2,8 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/arthurdelarge/simple-compiler/analyzer"
-	"github.com/arthurdelarge/simple-compiler/analyzer/lexical"
+	"github.com/arthurdelarge/simple-compiler/pkg/analyzer"
+	"github.com/arthurdelarge/simple-compiler/pkg/token"
 )
 
 func main() {
@@ -15,14 +14,14 @@ func main() {
 	}
 	defer scanner.Close()
 
-	var token lexical.Token
+	var token token.Token
 	for err == nil {
 		token, err = scanner.NextToken()
-		if token.GetClass() == lexical.TokenClassIgnore {
+		if token.GetClass() == token.TokenClassIgnore {
 			continue
 		}
 
-		if token.GetClass() == lexical.TokenClassError {
+		if token.GetClass() == token.TokenClassError {
 			if len(token.GetLexeme()) > 1 {
 				fmt.Printf("Classe: ERRO léxico - palavra %s inválida. Linha %d, coluna %d.\n", token.GetLexeme(), scanner.GetRow()+1, scanner.GetColumn()+1)
 			} else {
