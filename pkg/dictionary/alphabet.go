@@ -1,5 +1,7 @@
 package dictionary
 
+import "slices"
+
 type Alphabet struct {
 	digits  []byte
 	letters []byte
@@ -51,6 +53,14 @@ func CreateAlphabet() *Alphabet {
 	alphabet.symbols = append(alphabet.symbols, '"')
 	alphabet.symbols = append(alphabet.symbols, '_')
 	alphabet.symbols = append(alphabet.symbols, ' ')
+	alphabet.symbols = append(alphabet.symbols, '\n')
+	alphabet.symbols = append(alphabet.symbols, '\r')
+	alphabet.symbols = append(alphabet.symbols, '\t')
+	alphabet.symbols = append(alphabet.symbols, 0)
 
 	return alphabet
+}
+
+func (a *Alphabet) Contains(char byte) bool {
+	return slices.Contains(a.symbols, char)
 }

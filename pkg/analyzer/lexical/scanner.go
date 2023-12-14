@@ -3,6 +3,7 @@ package lexical
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"github.com/arthurdelarge/simple-compiler/pkg/dictionary"
 	"github.com/arthurdelarge/simple-compiler/pkg/symboltable"
 	"github.com/arthurdelarge/simple-compiler/pkg/token"
@@ -64,13 +65,16 @@ func (s *Scanner) nextChar() (byte, error) {
 	return char, nil
 }
 
-func (s *Scanner) NextToken() (token.Token, error) {
-	stateMachineStop := false
-	var state dictionary.State
+func (s *Scanner) nextToken() (token.Token, error) {
+	mustReadNextSymbol := true
+	if s.hasValidSymbolInBuffer() {
+		mustReadNextSymbol = false
+	}
 
-	firstRun := true
-	for !stateMachineStop {
-		if s.currentSymbol == 0 {
+	var state dictionary.State
+	machineStop := false
+	for !machineStop {
+		if mustReadNextSymbol {
 			symbol, err := s.nextChar()
 
 			if err != nil && symbol != 0 {
@@ -78,29 +82,59 @@ func (s *Scanner) NextToken() (token.Token, error) {
 			}
 
 			s.currentSymbol = symbol
+			mustReadNextSymbol = false
 		}
 
-		state, stateMachineStop = s.stateMachine.UpdateState(s.currentSymbol)
+		state, machineStop = s.stateMachine.UpdateState(s.currentSymbol)
 
 		if s.previousSymbol != 0 {
 			s.lexemeBuilder.WriteByte(s.previousSymbol)
 			s.previousSymbol = 0
 		}
 
-		if stateMachineStop && firstRun {
+		if machineStop && s.stateMachine.RejectInLastMove() && state == dictionary.InitialState {
 			s.lexemeBuilder.WriteByte(s.currentSymbol)
-			s.currentSymbol = 0
 		}
 
-		if !stateMachineStop {
+		if !machineStop {
 			s.previousSymbol = s.currentSymbol
-			s.currentSymbol = 0
+			mustReadNextSymbol = true
 		}
 
-		firstRun = false
+	}
+
+	if s.IsError(state) {
+		errorMsg := s.getErrorMessage(state)
+		errorTkn := *token.NewToken(token.ClassError, s.GetCurrentLexeme(), token.TypeNull)
+		return errorTkn, errors.New(errorMsg)
 	}
 
 	tkn := s.identifySMState(state)
+
+	return tkn, nil
+}
+
+func (s *Scanner) NextToken() (token.Token, error) {
+	var tkn token.Token
+	var err error
+	for {
+		tkn, err = s.nextToken()
+
+		if err != nil {
+			fmt.Fprint(os.Stderr, err.Error())
+			continue
+		}
+
+		if tkn.GetClass() == token.ClassIgnore {
+			continue
+		}
+
+		if tkn.GetClass() == token.ClassComment {
+			continue
+		}
+
+		break
+	}
 
 	if tkn.GetClass() == token.ClassEOF {
 		return tkn, errors.New("EOF")
@@ -155,4 +189,47 @@ func (s *Scanner) identifySMState(state dictionary.State) token.Token {
 	}
 
 	return *token.NewToken(token.ClassError, s.GetCurrentLexeme(), token.TypeNull)
+}
+
+func (s *Scanner) getErrorMessage(state dictionary.State) string {
+	msg := "PANIC"
+
+	if !s.stateMachine.InAlphabet(s.currentSymbol) {
+		msg = s.strangeCharacterMessage()
+	} else if !s.stateMachine.IsFinalState(state) {
+		msg = s.notFinalStageMessage(state)
+	}
+
+	return msg
+}
+
+func (s *Scanner) strangeCharacterMessage() string {
+	return fmt.Sprintf("Classe: ERRO léxico - caractere %s desconhecido. Linha %d, coluna %d.\n", s.GetCurrentLexeme(), s.GetRow()+1, s.GetColumn()+1)
+}
+
+func (s *Scanner) notFinalStageMessage(state dictionary.State) string {
+	lex := s.GetCurrentLexeme()
+	row := s.GetRow() + 1
+	col := s.GetColumn() + 1
+	switch s.stateMachine.GetError(state) {
+	case dictionary.InvalidNumber:
+		return fmt.Sprintf("Classe: ERRO léxico - número %s inválido. Linha %d, coluna %d.\n", lex, row, col)
+	case dictionary.IncompleteLiteral:
+		return fmt.Sprintf("Classe: ERRO léxico, Linha %d, coluna %d - Literal incompleto: %s\n", row, col, lex)
+	case dictionary.IncompleteComment:
+		return fmt.Sprintf("Classe: ERRO léxico, Linha %d, coluna %d - Comentário incompleto: %s\n", row, col, lex)
+	}
+
+	return fmt.Sprintf("Classe: ERRO léxico - palavra %s inválida. Linha %d, coluna %d.\n", lex, row, col)
+}
+
+func (s *Scanner) IsError(state dictionary.State) bool {
+	return !s.stateMachine.IsFinalState(state) || !s.stateMachine.InAlphabet(s.currentSymbol)
+}
+
+func (s *Scanner) hasValidSymbolInBuffer() bool {
+	acceptedLastMove := s.stateMachine.StoppedInLastMove() && !s.stateMachine.RejectInLastMove()
+	rejectedButKnownChar := s.stateMachine.RejectInLastMove() && s.stateMachine.InAlphabet(s.currentSymbol)
+	rejectedInInitialSate := s.stateMachine.GetLastStopState() == dictionary.InitialState
+	return acceptedLastMove || (rejectedButKnownChar && !rejectedInInitialSate)
 }

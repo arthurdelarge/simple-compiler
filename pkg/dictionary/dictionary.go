@@ -6,12 +6,15 @@ type transition struct {
 }
 
 type MgolStateMachine struct {
-	alphabet      *Alphabet
-	initialState  State
-	currentState  State
-	isFinalState  map[State]bool
-	currentSymbol byte
-	transitionMap map[transition]State
+	alphabet        *Alphabet
+	initialState    State
+	currentState    State
+	lastStopState   State
+	stoppedLastMove bool
+	rejectLastMove  bool
+	isFinalState    map[State]bool
+	currentSymbol   byte
+	transitionMap   map[transition]State
 }
 
 func CreateMgolStateMachine() *MgolStateMachine {
@@ -23,10 +26,13 @@ func CreateMgolStateMachine() *MgolStateMachine {
 	}
 
 	stateMachine := &MgolStateMachine{
-		alphabet:     CreateAlphabet(),
-		initialState: InitialState,
-		currentState: InitialState,
-		isFinalState: isFinalState,
+		alphabet:        CreateAlphabet(),
+		initialState:    InitialState,
+		currentState:    InitialState,
+		lastStopState:   InitialState,
+		isFinalState:    isFinalState,
+		stoppedLastMove: false,
+		rejectLastMove:  false,
 	}
 
 	stateMachine.loadTransitionMap()
@@ -39,18 +45,32 @@ func (sm *MgolStateMachine) UpdateState(symbol byte) (State, bool) {
 	nextState, found := sm.transitionMap[key]
 
 	if !found {
-		stopState := sm.currentState
+		sm.lastStopState = sm.currentState
 		sm.currentState = 0
+		sm.stoppedLastMove = true
+		if !sm.IsFinalState(sm.lastStopState) {
+			sm.rejectLastMove = true
+		}
 
-		return stopState, true
+		return sm.lastStopState, true
 	}
 
+	sm.stoppedLastMove = false
+	sm.rejectLastMove = false
 	sm.currentState = nextState
 	return sm.currentState, false
 }
 
 func (sm *MgolStateMachine) IsFinalState(s State) bool {
 	return sm.isFinalState[s]
+}
+
+func (sm *MgolStateMachine) StoppedInLastMove() bool {
+	return sm.stoppedLastMove
+}
+
+func (sm *MgolStateMachine) RejectInLastMove() bool {
+	return sm.rejectLastMove
 }
 
 func (sm *MgolStateMachine) loadTransitionMap() {
@@ -84,7 +104,7 @@ func (sm *MgolStateMachine) loadTransitionMap() {
 
 	transitionMap[transition{from: 0, symbol: '"'}] = 10
 	for _, symbol := range sm.alphabet.symbols {
-		if symbol == '"' {
+		if symbol == '"' || symbol == 0 {
 			continue
 		}
 
@@ -102,7 +122,7 @@ func (sm *MgolStateMachine) loadTransitionMap() {
 
 	transitionMap[transition{from: 0, symbol: '{'}] = 14
 	for _, symbol := range sm.alphabet.symbols {
-		if symbol == '}' {
+		if symbol == '}' || symbol == 0 {
 			continue
 		}
 
@@ -138,4 +158,35 @@ func (sm *MgolStateMachine) loadTransitionMap() {
 	transitionMap[transition{from: 0, symbol: '\t'}] = 27
 
 	sm.transitionMap = transitionMap
+}
+
+func (sm *MgolStateMachine) InAlphabet(char byte) bool {
+	return sm.alphabet.Contains(char)
+}
+
+func (sm *MgolStateMachine) GetError(state State) ErrorCode {
+	switch state {
+	case 3:
+		return InvalidNumber
+	case 4:
+		return InvalidNumber
+	case 7:
+		return InvalidNumber
+	case 8:
+		return InvalidNumber
+	case 10:
+		return IncompleteLiteral
+	case 11:
+		return IncompleteLiteral
+	case 14:
+		return IncompleteComment
+	case 15:
+		return IncompleteComment
+	}
+
+	return Unknown
+}
+
+func (sm *MgolStateMachine) GetLastStopState() State {
+	return sm.lastStopState
 }
