@@ -1,0 +1,21 @@
+TIPO -> literal
+L -> id
+D -> TIPO L ;
+LV -> varfim ;
+LV -> D LV
+V -> varinicio LV
+ARG -> lit
+ES -> escreva ARG ;
+OPRD -> id
+Erro Sintático, linha 5, coluna 16 - Esperando {id, Num} recebeu {inteiro}
+RESYNC: EXP_R -> OPRD opr OPRD
+CAB -> se ( EXP_R ) entao
+CP -> fimse
+COND -> CAB CP
+ARG -> lit
+ES -> escreva ARG ;
+A -> fim
+A -> ES A
+A -> COND A
+A -> ES A
+P -> inicio V A

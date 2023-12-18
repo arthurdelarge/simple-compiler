@@ -33,6 +33,15 @@ const (
 	ClassReal      Class = 27
 )
 
+func GetTokenClasses() []Class {
+	return []Class{
+		ClassError, ClassNum, ClassLit, ClassId, ClassComment, ClassEOF, ClassROperator, ClassAOperator, ClassReceive,
+		ClassOpenP, ClassCloseP, ClassSemicolon, ClassComma, ClassIgnore, ClassInicio, ClassVarinicio, ClassVarfim,
+		ClassEscreva, ClassLeia, ClassSe, ClassEntao, ClassFimse, ClassRepita, ClassFimrepita, ClassFim, ClassInteiro,
+		ClassLiteral, ClassReal,
+	}
+}
+
 func (t Class) String() string {
 	switch t {
 	case ClassError:

@@ -204,7 +204,7 @@ func (s *Scanner) getErrorMessage(state dictionary.State) string {
 }
 
 func (s *Scanner) strangeCharacterMessage() string {
-	return fmt.Sprintf("Classe: ERRO léxico - caractere %s desconhecido. Linha %d, coluna %d.\n", s.GetCurrentLexeme(), s.GetRow()+1, s.GetColumn()+1)
+	return fmt.Sprintf("Erro léxico - caractere \u001B[0;31m %s \u001B[0m desconhecido. Linha %d, coluna %d.\n", s.GetCurrentLexeme(), s.GetRow()+1, s.GetColumn()+1)
 }
 
 func (s *Scanner) notFinalStageMessage(state dictionary.State) string {
@@ -213,14 +213,14 @@ func (s *Scanner) notFinalStageMessage(state dictionary.State) string {
 	col := s.GetColumn() + 1
 	switch s.stateMachine.GetError(state) {
 	case dictionary.InvalidNumber:
-		return fmt.Sprintf("Classe: ERRO léxico - número %s inválido. Linha %d, coluna %d.\n", lex, row, col)
+		return fmt.Sprintf("Erro Léxico - número \u001B[0;31m %s \u001B[0m inválido. Linha %d, coluna %d.\n", lex, row, col)
 	case dictionary.IncompleteLiteral:
-		return fmt.Sprintf("Classe: ERRO léxico, Linha %d, coluna %d - Literal incompleto: %s\n", row, col, lex)
+		return fmt.Sprintf("Erro Léxico, Linha %d, coluna %d - Literal incompleto:\u001B[0;31m %s \u001B[0m\n", row, col, lex)
 	case dictionary.IncompleteComment:
-		return fmt.Sprintf("Classe: ERRO léxico, Linha %d, coluna %d - Comentário incompleto: %s\n", row, col, lex)
+		return fmt.Sprintf("Erro Léxico, Linha %d, coluna %d - Comentário incompleto:\u001B[0;31m %s \u001B[0m\n", row, col, lex)
 	}
 
-	return fmt.Sprintf("Classe: ERRO léxico - palavra %s inválida. Linha %d, coluna %d.\n", lex, row, col)
+	return fmt.Sprintf("Erro Léxico - palavra\u001B[0;31m %s\u001B[0m inválida. Linha %d, coluna %d.\n", lex, row, col)
 }
 
 func (s *Scanner) IsError(state dictionary.State) bool {
