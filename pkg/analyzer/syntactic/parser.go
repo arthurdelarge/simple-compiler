@@ -5,7 +5,6 @@ import (
 	"github.com/arthurdelarge/simple-compiler/pkg/analyzer"
 	"github.com/arthurdelarge/simple-compiler/pkg/analyzer/syntactic/automaton"
 	"github.com/arthurdelarge/simple-compiler/pkg/token"
-	"time"
 )
 
 type Parser struct {
@@ -31,12 +30,13 @@ func (p *Parser) Parse() error {
 
 	for {
 		movePointer, err = p.automaton.Move(t.GetClass())
-		time.Sleep(60 * time.Millisecond)
+
 		if err != nil {
 			if err.Error() == "reject" || err.Error() == "accept" {
 				fmt.Println(err.Error())
 				break
 			}
+
 			if t.GetClass() == token.ClassEOF {
 				break
 			}
