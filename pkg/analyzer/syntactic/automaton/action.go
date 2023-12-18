@@ -8,7 +8,6 @@ const (
 	shiftActionKind  actionKind = 1
 	reduceActionKind actionKind = 2
 	acceptActionKind actionKind = 3
-	rejectActionKind actionKind = 4
 )
 
 type action struct {

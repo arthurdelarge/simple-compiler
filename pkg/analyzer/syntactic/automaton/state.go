@@ -103,5 +103,10 @@ func (s state) rejectMessage(tclass token.Class) string {
 		expected = fmt.Sprintf("%s, %s", token.ClassId.String(), token.ClassLeia.String())
 	}
 
-	return fmt.Sprintf("Esperando {%s} recebeu {%s}", expected, tclass.String())
+	errMsg := fmt.Sprintf("Esperando {%s} recebeu {%s}", expected, tclass.String())
+	if tclass == token.ClassEOF {
+		errMsg += " - Fim de arquivo inesperado "
+	}
+
+	return errMsg
 }

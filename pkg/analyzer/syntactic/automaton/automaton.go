@@ -216,16 +216,11 @@ func (p *PushdownAutomaton) Move(symbol token.Class) (bool, error) {
 		return p.panicMove(symbol)
 	}
 
-	currentState, ok := p.stack.Top()
-	if !ok {
-		panic("empty stack")
-	}
+	currentState, _ := p.stack.Top()
 
 	act, ok := p.actions[currentState][symbol]
 	if !ok {
-		p.status = "reject"
-		p.panicMode = true
-		return false, errors.New(currentState.rejectMessage(symbol))
+		return p.errorRecovery(symbol, currentState)
 	}
 
 	switch act.kind {
@@ -241,6 +236,17 @@ func (p *PushdownAutomaton) Move(symbol token.Class) (bool, error) {
 	}
 
 	return false, errors.New("no valid move")
+}
+
+func (p *PushdownAutomaton) errorRecovery(symbol token.Class, currentState state) (bool, error) {
+	p.status = "reject"
+
+	if p.canRecoverPhrase(symbol) {
+		return p.recoverPhrase(symbol)
+	}
+
+	p.panicMode = true
+	return false, errors.New(currentState.rejectMessage(symbol))
 }
 
 func (p *PushdownAutomaton) panicMove(symbol token.Class) (bool, error) {
@@ -320,4 +326,72 @@ func (p *PushdownAutomaton) resyncVarfim() (bool, error) {
 	p.panicMode = false
 	fmt.Printf("RESYNC {%s}\n", token.ClassVarfim.String())
 	return true, nil
+}
+
+func (p *PushdownAutomaton) canRecoverPhrase(symbol token.Class) bool {
+	currentState, _ := p.stack.Top()
+	act, canMoveWithSemicolon := p.actions[currentState][token.ClassSemicolon]
+	if !canMoveWithSemicolon {
+		return false
+	}
+
+	currentState = p.simulateAction(act)
+
+	_, ok := p.actions[currentState][symbol]
+	if ok {
+		return true
+	}
+
+	return false
+}
+
+func (p *PushdownAutomaton) simulateAction(act action) state {
+	var currentState state
+	copyStack := p.stack.Copy()
+
+	for act.kind == reduceActionKind {
+		currentState, _ = copyStack.Top()
+		act, _ = p.actions[currentState][token.ClassSemicolon]
+
+		switch act.kind {
+		case shiftActionKind:
+			state := act.value.(shiftAction).target
+			copyStack.Push(state)
+		case reduceActionKind:
+			prodId := act.value.(reduceAction).target
+			prod := p.prods[prodId]
+			for i := byte(0); i < prod.RightSideSize(); i++ {
+				copyStack.Pop()
+			}
+
+			nterm := prod.LeftSide()
+			currentState, _ := copyStack.Top()
+			state := p.detours[currentState][nterm]
+			copyStack.Push(state)
+		}
+	}
+
+	currentState, _ = copyStack.Top()
+	return currentState
+}
+
+func (p *PushdownAutomaton) recoverPhrase(symbol token.Class) (bool, error) {
+	currentState, _ := p.stack.Top()
+	act, _ := p.actions[currentState][token.ClassSemicolon]
+
+	for act.kind == reduceActionKind {
+		currentState, _ = p.stack.Top()
+		act, _ = p.actions[currentState][token.ClassSemicolon]
+
+		switch act.kind {
+		case shiftActionKind:
+			p.shift(act)
+			return false, errors.New(fmt.Sprintf("Possível falta de {%s}", token.ClassSemicolon.String()))
+		case reduceActionKind:
+			production := p.reduce(act)
+			fmt.Printf("%v\n", production.String())
+		}
+	}
+
+	return false, errors.New("failed to recover")
 }

@@ -42,3 +42,10 @@ func (s *Stack[T]) Top() (T, bool) {
 
 	return element, true
 }
+
+func (s *Stack[T]) Copy() *Stack[T] {
+	elements := make([]T, len(s.elements))
+	copy(elements, s.elements)
+
+	return &Stack[T]{elements: elements}
+}

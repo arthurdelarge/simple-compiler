@@ -1,8 +1,7 @@
 inicio varinicio
 literal A;
 varfim;
-escreva "oi";
+escreva "oi"
 se (a > 2) entao
 fimse
 escreva "tchau";
-fim

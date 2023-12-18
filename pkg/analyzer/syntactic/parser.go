@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/arthurdelarge/simple-compiler/pkg/analyzer"
 	"github.com/arthurdelarge/simple-compiler/pkg/analyzer/syntactic/automaton"
-	"github.com/arthurdelarge/simple-compiler/pkg/token"
 )
 
 type Parser struct {
@@ -34,10 +33,6 @@ func (p *Parser) Parse() error {
 		if err != nil {
 			if err.Error() == "reject" || err.Error() == "accept" {
 				fmt.Println(err.Error())
-				break
-			}
-
-			if t.GetClass() == token.ClassEOF {
 				break
 			}
 
