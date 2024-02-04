@@ -1,30 +1,30 @@
-package automaton
+package dictionary
 
-type production struct {
+type Production struct {
 	id            byte
 	rule          string
-	left          nonTerminal
+	left          NonTerminal
 	rightSideSize byte
 }
 
-func (p production) String() string {
+func (p Production) String() string {
 	return p.rule
 }
 
-func (p production) ID() byte {
+func (p Production) ID() byte {
 	return p.id
 }
 
-func (p production) RightSideSize() byte {
-	return p.rightSideSize
+func (p Production) RightSideSize() int {
+	return int(p.rightSideSize)
 }
 
-func (p production) LeftSide() nonTerminal {
+func (p Production) LeftSide() NonTerminal {
 	return p.left
 }
 
-func GetMgolProductions() map[byte]*production {
-	return map[byte]*production{
+func GetMgolProductions() map[byte]*Production {
+	return map[byte]*Production{
 		1:  {1, "P' -> P", NTermPI, 1},
 		2:  {2, "P -> inicio V A", NTermP, 3},
 		3:  {3, "V -> varinicio LV", NTermV, 2},

@@ -12,13 +12,13 @@ const (
 func (t Type) String() string {
 	switch t {
 	case TypeNull:
-		return "Nulo"
+		return "null"
 	case TypeInteger:
-		return "Inteiro"
+		return "int"
 	case TypeReal:
-		return "Real"
+		return "double"
 	case TypeLiteral:
-		return "Literal"
+		return "literal"
 	}
 
 	return "UNKNOWN"

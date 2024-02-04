@@ -31,6 +31,10 @@ func (s *Stack[T]) Print() {
 	fmt.Printf("%+v\n", s.elements)
 }
 
+func (s *Stack[T]) Array() []T {
+	return s.elements
+}
+
 func (s *Stack[T]) Top() (T, bool) {
 	var element T
 

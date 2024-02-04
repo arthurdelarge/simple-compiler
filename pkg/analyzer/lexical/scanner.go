@@ -11,6 +11,10 @@ import (
 	"strings"
 )
 
+type pos struct {
+	row, col int
+}
+
 type Scanner struct {
 	file           *os.File
 	reader         *bufio.Reader
@@ -20,6 +24,7 @@ type Scanner struct {
 	stateMachine   *dictionary.MgolStateMachine
 	symbolTable    *symboltable.SymbolTable
 	row, column    int
+	logPos         []pos
 }
 
 func NewScanner(filename string) (*Scanner, error) {
@@ -39,15 +44,20 @@ func NewScanner(filename string) (*Scanner, error) {
 		symbolTable:    symboltable.CreateSymbolTable(),
 		row:            0,
 		column:         0,
+		logPos:         make([]pos, 0),
 	}, nil
 }
 
 func (s *Scanner) GetRow() int {
-	return s.row
+	return s.logPos[len(s.logPos)-2].row
 }
 
 func (s *Scanner) GetColumn() int {
-	return s.column - 1
+	return s.logPos[len(s.logPos)-2].col - 1
+}
+
+func (s *Scanner) PrintSymbolTable() {
+	s.symbolTable.Print()
 }
 
 func (s *Scanner) nextChar() (byte, error) {
@@ -65,7 +75,7 @@ func (s *Scanner) nextChar() (byte, error) {
 	return char, nil
 }
 
-func (s *Scanner) nextToken() (token.Token, error) {
+func (s *Scanner) nextToken() (*token.Token, error) {
 	mustReadNextSymbol := true
 	if s.hasValidSymbolInBuffer() {
 		mustReadNextSymbol = false
@@ -73,6 +83,8 @@ func (s *Scanner) nextToken() (token.Token, error) {
 
 	var state dictionary.State
 	machineStop := false
+	mustLog := true
+	startPos := pos{}
 	for !machineStop {
 		if mustReadNextSymbol {
 			symbol, err := s.nextChar()
@@ -83,6 +95,11 @@ func (s *Scanner) nextToken() (token.Token, error) {
 
 			s.currentSymbol = symbol
 			mustReadNextSymbol = false
+		}
+
+		if mustLog {
+			mustLog = false
+			startPos = pos{s.row, s.column}
 		}
 
 		state, machineStop = s.stateMachine.UpdateState(s.currentSymbol)
@@ -106,16 +123,19 @@ func (s *Scanner) nextToken() (token.Token, error) {
 	if s.IsError(state) {
 		errorMsg := s.getErrorMessage(state)
 		errorTkn := *token.NewToken(token.ClassError, s.GetCurrentLexeme(), token.TypeNull)
-		return errorTkn, errors.New(errorMsg)
+		return &errorTkn, errors.New(errorMsg)
 	}
 
 	tkn := s.identifySMState(state)
+	if tkn.GetClass() != token.ClassIgnore {
+		s.logPos = append(s.logPos, startPos)
+	}
 
 	return tkn, nil
 }
 
-func (s *Scanner) NextToken() (token.Token, error) {
-	var tkn token.Token
+func (s *Scanner) NextToken() (*token.Token, error) {
+	var tkn *token.Token
 	var err error
 	for {
 		tkn, err = s.nextToken()
@@ -152,43 +172,43 @@ func (s *Scanner) Close() error {
 	return s.file.Close()
 }
 
-func (s *Scanner) searchSymbolTable(lexeme string) token.Token {
+func (s *Scanner) searchSymbolTable(lexeme string) *token.Token {
 	return s.symbolTable.GetTokenFor(lexeme)
 }
 
-func (s *Scanner) identifySMState(state dictionary.State) token.Token {
+func (s *Scanner) identifySMState(state dictionary.State) *token.Token {
 	switch state {
 	case dictionary.FinalStatesNum1, dictionary.FinalStatesNum2:
-		return *token.NewToken(token.ClassNum, s.GetCurrentLexeme(), token.TypeInteger)
+		return token.NewToken(token.ClassNum, s.GetCurrentLexeme(), token.TypeInteger)
 	case dictionary.FinalStatesNum3, dictionary.FinalStatesNum4, dictionary.FinalStatesNum5:
-		return *token.NewToken(token.ClassNum, s.GetCurrentLexeme(), token.TypeReal)
+		return token.NewToken(token.ClassNum, s.GetCurrentLexeme(), token.TypeReal)
 	case dictionary.FinalStateLit:
-		return *token.NewToken(token.ClassLit, s.GetCurrentLexeme(), token.TypeLiteral)
+		return token.NewToken(token.ClassLit, s.GetCurrentLexeme(), token.TypeLiteral)
 	case dictionary.FinalStateId:
 		return s.searchSymbolTable(s.GetCurrentLexeme())
 	case dictionary.FinalStateComment:
-		return *token.NewToken(token.ClassComment, s.GetCurrentLexeme(), token.TypeNull)
+		return token.NewToken(token.ClassComment, s.GetCurrentLexeme(), token.TypeNull)
 	case dictionary.FinalStateEOF:
-		return *token.NewToken(token.ClassEOF, s.GetCurrentLexeme(), token.TypeNull)
+		return token.NewToken(token.ClassEOF, s.GetCurrentLexeme(), token.TypeNull)
 	case dictionary.FinalStateROperator1, dictionary.FinalStateROperator2, dictionary.FinalStateROperator3:
-		return *token.NewToken(token.ClassROperator, s.GetCurrentLexeme(), token.TypeNull)
+		return token.NewToken(token.ClassROperator, s.GetCurrentLexeme(), token.TypeNull)
 	case dictionary.FinalStateAOperator:
-		return *token.NewToken(token.ClassAOperator, s.GetCurrentLexeme(), token.TypeNull)
+		return token.NewToken(token.ClassAOperator, s.GetCurrentLexeme(), token.TypeNull)
 	case dictionary.FinalStateReceive:
-		return *token.NewToken(token.ClassReceive, s.GetCurrentLexeme(), token.TypeNull)
+		return token.NewToken(token.ClassReceive, s.GetCurrentLexeme(), token.TypeNull)
 	case dictionary.FinalStateOpenP:
-		return *token.NewToken(token.ClassOpenP, s.GetCurrentLexeme(), token.TypeNull)
+		return token.NewToken(token.ClassOpenP, s.GetCurrentLexeme(), token.TypeNull)
 	case dictionary.FinalStateCloseP:
-		return *token.NewToken(token.ClassCloseP, s.GetCurrentLexeme(), token.TypeNull)
+		return token.NewToken(token.ClassCloseP, s.GetCurrentLexeme(), token.TypeNull)
 	case dictionary.FinalStateSemicolon:
-		return *token.NewToken(token.ClassSemicolon, s.GetCurrentLexeme(), token.TypeNull)
+		return token.NewToken(token.ClassSemicolon, s.GetCurrentLexeme(), token.TypeNull)
 	case dictionary.FinalStateComma:
-		return *token.NewToken(token.ClassComma, s.GetCurrentLexeme(), token.TypeNull)
+		return token.NewToken(token.ClassComma, s.GetCurrentLexeme(), token.TypeNull)
 	case dictionary.FinalStateIgnore:
-		return *token.NewToken(token.ClassIgnore, s.GetCurrentLexeme(), token.TypeNull)
+		return token.NewToken(token.ClassIgnore, s.GetCurrentLexeme(), token.TypeNull)
 	}
 
-	return *token.NewToken(token.ClassError, s.GetCurrentLexeme(), token.TypeNull)
+	return token.NewToken(token.ClassError, s.GetCurrentLexeme(), token.TypeNull)
 }
 
 func (s *Scanner) getErrorMessage(state dictionary.State) string {

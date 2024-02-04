@@ -31,6 +31,8 @@ const (
 	ClassInteiro   Class = 25
 	ClassLiteral   Class = 26
 	ClassReal      Class = 27
+
+	ClassNonTerminal Class = 28
 )
 
 func GetTokenClasses() []Class {

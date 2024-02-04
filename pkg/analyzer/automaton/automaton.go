@@ -3,23 +3,27 @@ package automaton
 import (
 	"errors"
 	"fmt"
-	"github.com/arthurdelarge/simple-compiler/pkg/data"
-	"github.com/arthurdelarge/simple-compiler/pkg/token"
 	"slices"
+
+	"github.com/arthurdelarge/simple-compiler/pkg/analyzer/semantic"
+	"github.com/arthurdelarge/simple-compiler/pkg/data"
+	"github.com/arthurdelarge/simple-compiler/pkg/dictionary"
+	"github.com/arthurdelarge/simple-compiler/pkg/token"
 )
 
 type PushdownAutomaton struct {
 	stack           *data.Stack[state]
 	actions         map[state]map[token.Class]action
-	detours         map[state]map[nonTerminal]state
-	prods           map[byte]*production
+	detours         map[state]map[dictionary.NonTerminal]state
+	prods           map[byte]*dictionary.Production
 	syncSymbols     map[state][]token.Class
-	syncNonTerminal map[state]nonTerminal
+	syncNonTerminal map[state]dictionary.NonTerminal
+	semantic        *semantic.Semantic
 	panicMode       bool
 	status          string
 }
 
-func NewPushdownAutomaton() *PushdownAutomaton {
+func NewPushdownAutomaton(semantic *semantic.Semantic) *PushdownAutomaton {
 	stack := data.CreateStack[state]()
 	stack.Push(state(0))
 
@@ -27,9 +31,10 @@ func NewPushdownAutomaton() *PushdownAutomaton {
 		stack:           stack,
 		actions:         GetMgolActionTable(),
 		detours:         GetMgolDetourTable(),
-		prods:           GetMgolProductions(),
+		prods:           dictionary.GetMgolProductions(),
 		syncNonTerminal: GetSyncNonTerminal(),
 		syncSymbols:     GetSyncTerminals(),
+		semantic:        semantic,
 		panicMode:       false,
 		status:          "accept",
 	}
@@ -40,10 +45,13 @@ func (p *PushdownAutomaton) shift(act action) {
 	p.stack.Push(state)
 }
 
-func (p *PushdownAutomaton) reduce(act action) *production {
+func (p *PushdownAutomaton) getProduction(act action) dictionary.Production {
 	prodId := act.value.(reduceAction).target
-	prod := p.prods[prodId]
-	for i := byte(0); i < prod.RightSideSize(); i++ {
+	return *p.prods[prodId]
+}
+
+func (p *PushdownAutomaton) reduce(prod dictionary.Production) {
+	for i := 0; i < prod.RightSideSize(); i++ {
 		p.stack.Pop()
 	}
 
@@ -51,11 +59,11 @@ func (p *PushdownAutomaton) reduce(act action) *production {
 	currentState, _ := p.stack.Top()
 	state := p.detours[currentState][nterm]
 	p.stack.Push(state)
-	return prod
 }
 
-func (p *PushdownAutomaton) Move(symbol token.Class) (bool, error) {
-	//p.stack.Print()
+func (p *PushdownAutomaton) Move(tok *token.Token) (bool, error) {
+	symbol := tok.GetClass()
+
 	if p.panicMode {
 		return p.panicMove(symbol)
 	}
@@ -70,11 +78,13 @@ func (p *PushdownAutomaton) Move(symbol token.Class) (bool, error) {
 	switch act.kind {
 	case shiftActionKind:
 		p.shift(act)
+		p.semantic.PushToken(tok)
 		return true, nil
 	case reduceActionKind:
-		production := p.reduce(act)
-		fmt.Printf("%v\n", production.String())
-		return false, nil
+		prod := p.getProduction(act)
+		p.reduce(prod)
+		err := p.semantic.Evaluate(prod)
+		return false, err
 	case acceptActionKind:
 		return false, errors.New(p.status)
 	}
@@ -122,8 +132,8 @@ func (p *PushdownAutomaton) panicMove(symbol token.Class) (bool, error) {
 		p.panicMode = false
 		return true, nil
 	case reduceActionKind:
-		production := p.reduce(act)
-		fmt.Printf("%v\n", production.String())
+		prod := p.getProduction(act)
+		p.reduce(prod)
 		p.panicMode = false
 		return false, nil
 	case acceptActionKind:
@@ -205,7 +215,7 @@ func (p *PushdownAutomaton) simulateAction(act action) state {
 		case reduceActionKind:
 			prodId := act.value.(reduceAction).target
 			prod := p.prods[prodId]
-			for i := byte(0); i < prod.RightSideSize(); i++ {
+			for i := 0; i < prod.RightSideSize(); i++ {
 				copyStack.Pop()
 			}
 
@@ -233,8 +243,8 @@ func (p *PushdownAutomaton) recoverPhrase(symbol token.Class) (bool, error) {
 			p.shift(act)
 			return false, errors.New(fmt.Sprintf("Possível falta de {%s}", token.ClassSemicolon.String()))
 		case reduceActionKind:
-			production := p.reduce(act)
-			fmt.Printf("%v\n", production.String())
+			prod := p.getProduction(act)
+			p.reduce(prod)
 		}
 	}
 

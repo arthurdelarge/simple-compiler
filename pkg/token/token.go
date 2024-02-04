@@ -28,3 +28,7 @@ func (t *Token) GetLexeme() string {
 func (t *Token) GetType() Type {
 	return t.tokenType
 }
+
+func (t *Token) SetType(tknType Type) {
+	t.tokenType = tknType
+}

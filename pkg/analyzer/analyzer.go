@@ -6,10 +6,11 @@ import (
 )
 
 type LexicalAnalyzer interface {
-	NextToken() (token.Token, error)
+	NextToken() (*token.Token, error)
 	Close() error
 	GetRow() int
 	GetColumn() int
+	PrintSymbolTable()
 }
 
 func NewLexicalAnalyzer(filename string) (LexicalAnalyzer, error) {
